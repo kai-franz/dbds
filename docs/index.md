@@ -15,4 +15,4 @@ We are implementing a subset of the optimizations from [Dominance-Based Duplicat
 - [ ] \(100% goal) Implement Read Elimination
 - [ ] Add heuristics to determine if proposed optimization is beneficial
 - [ ] Implement Conditional Elimination
-{: style='list-style-type: none'}
+{:.tasklist}
