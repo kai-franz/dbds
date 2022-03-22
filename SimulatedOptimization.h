@@ -12,8 +12,7 @@ namespace llvm {
 
 class SimulatedOptimization {
  public:
-  void simulate(BasicBlock *BB, ValueMap<Value *, Value *> phi_vals);
-  void apply(BasicBlock *BB);
+  virtual void simulate(BasicBlock *BB, ValueMap<Value *, Value *> phi_vals) = 0;
 };
 
 }
