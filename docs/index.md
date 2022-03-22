@@ -7,7 +7,7 @@ We are implementing a subset of the optimizations from [Dominance-Based Duplicat
 [Project proposal (PDF)](./Proposal.pdf)
 
 ## Tasks
-- [ ] Implement a Dominance Tree Walk of the procedure
+- [x] Implement a Dominance Tree Walk of the procedure
 - [ ] Implement the Duplication Simulation Traversal step within the walk
 - [ ] \(75% goal) Implement Constant Folding for addition instructions
 - [ ] Implenent Constant folding for other instructions
