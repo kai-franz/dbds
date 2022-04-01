@@ -8,11 +8,11 @@ We are implementing a subset of the optimizations from [Dominance-Based Duplicat
 
 ## Tasks
 - [x] Implement a Dominance Tree Walk of the procedure
-- [ ] Implement the Duplication Simulation Traversal step within the walk
-- [ ] \(75% goal) Implement Constant Folding for addition instructions
-- [ ] Implenent Constant folding for other instructions
+- [x] Implement the Duplication Simulation Traversal step within the walk
+- [x] Implement Constant Folding for addition instructions
+- [x] Implenent Constant folding for other instructions
+- [ ] \(75% goal) Apply the results of a Duplication Simulation to the function
 - [ ] Implement Strength Reduction
 - [ ] \(100% goal) Implement Read Elimination
 - [ ] Add heuristics to determine if proposed optimization is beneficial
 - [ ] Implement Conditional Elimination
-{:.tasklist}
