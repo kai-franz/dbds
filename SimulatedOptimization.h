@@ -7,13 +7,12 @@
 #include "llvm/IR/CFG.h"
 #include "llvm/IR/Instructions.h"
 #include "llvm/IR/ValueMap.h"
+#include "SimulationResult.h"
 
 namespace llvm {
 
-class SimulatedOptimization {
- public:
-  virtual void simulate(BasicBlock *BB, ValueMap<Value *, Value *> phi_vals) = 0;
-};
+typedef std::function <bool (SimulationResult&)> SimulatedOptimization;
+
 
 }
 

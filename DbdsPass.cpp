@@ -5,17 +5,23 @@
 #include "llvm/IR/CFG.h"
 #include "llvm/IR/Instructions.h"
 #include "llvm/IR/ValueMap.h"
+#include "SimulationResult.h"
+#include "SimulatedOptimization.h"
+#include "ConstantFolding.h"
 
+using namespace llvm;
 
-namespace llvm {
+namespace {
 
 class DbdsPass : public FunctionPass {
  public:
   static char ID;
+  std::vector<SimulatedOptimization> optimizations { simulateCF };
+  std::vector<SimulationResult> opts;
 
   DbdsPass() : FunctionPass(ID) {}
 
-  bool RunOnFunction(Function &F) {
+   bool runOnFunction(Function &F) override {
     DominatorTree &D = getAnalysis<DominatorTreeWrapperPass>().getDomTree();
     bool modified = false;
 
@@ -43,7 +49,9 @@ class DbdsPass : public FunctionPass {
       } else {
         const DomTreeNodeBase<DominatorTree::NodeType> *Child = *ChildIt;
         BasicBlock *BB = Child->getBlock();
-        if (BB->getSinglePredecessor() != nullptr) {
+        BB->printAsOperand(outs(), false);
+        outs() << "\n";
+        if (BB->getSinglePredecessor() == nullptr) {
           // iterate over BB preds
           for (auto pred_it = pred_begin(BB), p_e = pred_end(BB); pred_it != p_e; ++pred_it) {
             simulate(BB, *pred_it);
@@ -62,11 +70,16 @@ class DbdsPass : public FunctionPass {
 
   void simulate(BasicBlock *BB, BasicBlock *predBB) {
     // ValueMap of phi instructions to their respective values
-    ValueMap<Value *, Value *> phi_vals;
+    SimulationResult result(BB, predBB);
     for (auto &phi : BB->phis()) {
-      phi_vals[&phi] = phi.getIncomingValueForBlock(predBB);
+      result.synonymMap[&phi] = phi.getIncomingValueForBlock(predBB);
+      outs() << "incoming value: " << *phi.getIncomingValueForBlock(predBB) << "\n";
     }
-
+    // simulate all optimizations
+    for (auto &opt : optimizations) {
+      opt(result);
+    }
+    opts.push_back(result);
   }
 
 };
