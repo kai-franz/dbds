@@ -69,8 +69,12 @@ class DbdsPass : public FunctionPass {
     }
     applySimulationResults();
     outs() << "--------- final BBs ---------\n";
+
     for(auto &BB : F) {
       outs() << BB << "\n";
+    }
+    while (mergeBlocks(F)) {
+      modified = true;
     }
     return modified;
   }
@@ -191,6 +195,15 @@ class DbdsPass : public FunctionPass {
         DeleteDeadBlock(opt.BB);
       }
     }
+  }
+
+  bool mergeBlocks(Function &F) {
+    for (auto &BB : F) {
+      if (MergeBlockIntoPredecessor(&BB)) {
+        return true;
+      }
+    }
+    return false;
   }
 };
 
