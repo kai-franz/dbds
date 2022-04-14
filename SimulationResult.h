@@ -22,10 +22,11 @@ struct SimulationResult {
  SimulationResult(BasicBlock *BB, BasicBlock *predBB) : BB(BB), predBB(predBB) {}
 
  Value *lookupInst(Value *V) {
-  Value *synonym = synonymMap[V];
-  if (synonym)
-   return synonym;
-  return V;
+   auto it = synonymMap.find(V);
+   if (it != synonymMap.end()) {
+     return it->second;
+   }
+   return V;
  }
  void replaceOperands(Instruction *I) {
   for (unsigned i = 0; i < I->getNumOperands(); i++) {

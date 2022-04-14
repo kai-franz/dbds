@@ -8,6 +8,7 @@
 #include "SimulationResult.h"
 #include "SimulatedOptimization.h"
 #include "ConstantFolding.h"
+#include "llvm/Transforms/Utils/BasicBlockUtils.h"
 
 using namespace llvm;
 
@@ -54,12 +55,22 @@ class DbdsPass : public FunctionPass {
         if (BB->getSinglePredecessor() == nullptr) {
           // iterate over BB preds
           for (auto pred_it = pred_begin(BB), p_e = pred_end(BB); pred_it != p_e; ++pred_it) {
-            simulate(BB, *pred_it);
+            // check if *pred_it has multiple successors
+            if ((*pred_it)->getSingleSuccessor() == BB) {
+              simulate(BB, *pred_it);
+            }
           }
         }
+        // print instructions in BB
+        outs() << *BB << "\n";
         ++WorkStack.back().second;
         WorkStack.push_back({Child, Child->begin()});
       }
+    }
+    applySimulationResults();
+    outs() << "--------- final BBs ---------\n";
+    for(auto &BB : F) {
+      outs() << BB << "\n";
     }
     return modified;
   }
@@ -82,6 +93,105 @@ class DbdsPass : public FunctionPass {
     opts.push_back(result);
   }
 
+  void applySimulationResults() {
+    outs() << "-----------------------------------Applying simulation results\n";
+    for (auto &opt : opts) {
+      // print synonym map
+      for (auto &synonym : opt.synonymMap) {
+        outs() << "synonym: " << *synonym.first << " -> " << *synonym.second << "\n";
+      }
+      opt.predBB->getTerminator()->eraseFromParent();
+      BasicBlock *phiBB = opt.BB->splitBasicBlock(opt.BB->getTerminator(), "split");
+      BranchInst::Create(phiBB, opt.predBB);
+      // split opt.BB right before its terminator
+      for (auto &inst : *opt.BB) {
+        if (&inst == opt.BB->getTerminator()) {
+          break;
+        }
+        Instruction *replacementInst;
+        Value *replacementValue;
+        if (auto phi = dyn_cast<PHINode>(&inst)) {
+          outs() << "phi: " << *phi << "\n";
+          phi->removeIncomingValue(opt.predBB, false);
+          replacementInst = phi;
+        }
+        else {
+          outs() << "inst: " << inst << "\n";
+          auto it = opt.synonymMap.find(&inst);
+          if (it != opt.synonymMap.end()) {
+            outs() << "replacing " << inst << " with " << *opt.synonymMap[&inst] << "\n";
+            replacementValue = it->second;
+            replacementInst = dyn_cast<Instruction>(replacementValue);
+          } else {
+            replacementInst = inst.clone();
+            replacementInst->setName(inst.getName() + ".sim");
+            replacementValue = replacementInst;
+          }
+          if (replacementInst != nullptr) {
+            // iterator over replacementInst's operands
+            for (auto OI = replacementInst->op_begin(), OE = replacementInst->op_end(); OI != OE; ++OI) {
+              if (isa<Instruction>(*OI)) {
+                auto synIt = opt.synonymMap.find(cast<Instruction>(*OI));
+                if (synIt != opt.synonymMap.end()) {
+                  outs() << "replacing " << **OI << " in " << (*OI->getUser()) << " with " << *synIt->second << "\n";
+                  *OI = synIt->second;
+                }
+              }
+            }
+            opt.synonymMap[&inst] = replacementInst;
+            replacementInst->insertBefore(opt.predBB->getTerminator());
+          }
+        }
+        // iterate over the replacementInst's uses, checking if there is at least one oustide of BB
+        bool usedOutside = false;
+        for (auto UI = inst.use_begin(), UE = inst.use_end(); UI != UE; ++UI) {
+          auto *I = dyn_cast<Instruction>(UI->getUser());
+          if (I != nullptr && (I->getParent() != opt.BB || isa<PHINode>(I))) {
+            if (isa<PHINode>(I)) {
+              outs() << *I << " is a phi node" << "\n";
+            }
+            if (I->getParent() != opt.BB) {
+              outs() << *I << " parent is not original BB: " << *I->getParent() << "\n";
+            }
+            usedOutside = true;
+            break;
+          }
+        }
+        if (usedOutside) {
+          // add a phi node to phiBB with arguments for replacementInst and inst
+          PHINode *phi = PHINode::Create(replacementValue->getType(), 2, "");
+          phi->insertBefore(phiBB->getTerminator());
+          phi->addIncoming(replacementValue, opt.predBB);
+          phi->addIncoming(&inst, opt.BB);
+          outs() << "added phi node: " << *phi << "\n";
+          inst.replaceUsesWithIf(phi, [&](Use &U) {
+            bool phiNode = isa<PHINode>(U.getUser());
+            auto parent = dyn_cast<Instruction>(U.getUser())->getParent();
+            // Replace all uses that do not see the phi node.
+            // We don't replace the following:
+            // 1. The other uses inside the original basic block
+            // 2. The uses inside the phi node we just added
+            // Every other use is replaced with the phi node we created.
+            // Other uses inside the original basic block cannot use the phi node
+            // because of self-loops.
+            return (phiNode || parent != opt.BB) && !(parent == phiBB && phiNode);
+          });
+        }
+      }
+      // if opt.BB has no predecessors, remove it
+      if (!opt.BB->hasNPredecessorsOrMore(1)) {
+        outs() << "BB has no predecessors; removing it\n";
+        for (auto &inst : *phiBB) {
+          if (auto phi = dyn_cast<PHINode>(&inst)) {
+            outs() << "removing incoming value for phi: " << *phi << "\n";
+          } else {
+            break;
+          }
+        }
+        DeleteDeadBlock(opt.BB);
+      }
+    }
+  }
 };
 
 char DbdsPass::ID = 0;
