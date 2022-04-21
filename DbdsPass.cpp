@@ -8,6 +8,7 @@
 #include "SimulationResult.h"
 #include "SimulatedOptimization.h"
 #include "ConstantFolding.h"
+#include "StrengthReduction.h"
 #include "llvm/Transforms/Utils/BasicBlockUtils.h"
 
 using namespace llvm;
@@ -17,7 +18,7 @@ namespace {
 class DbdsPass : public FunctionPass {
  public:
   static char ID;
-  std::vector<SimulatedOptimization> optimizations { simulateCF };
+  std::vector<SimulatedOptimization> optimizations { simulateCF, simulateSR };
   std::vector<SimulationResult> opts;
 
   DbdsPass() : FunctionPass(ID) {}

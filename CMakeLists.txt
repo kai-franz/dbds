@@ -5,4 +5,4 @@ include_directories(/home/user/llvm-v10/include /usr/local/opt/llvm/include /Use
 
 set(CMAKE_CXX_STANDARD 14)
 
-add_executable(DbdsPass DbdsPass.cpp SimulatedOptimization.h SimulationResult.cpp SimulationResult.h ConstantFolding.h)
+add_executable(DbdsPass DbdsPass.cpp SimulatedOptimization.h SimulationResult.cpp SimulationResult.h ConstantFolding.h StrengthReduction.h)
