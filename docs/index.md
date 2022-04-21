@@ -6,7 +6,7 @@ We are implementing a subset of the optimizations from [Dominance-Based Duplicat
 
 [Project proposal (PDF)](./Proposal.pdf)
 
-[Milestone (PDF)]("./Milestone.pdf")
+[Milestone (PDF)](./Milestone.pdf)
 
 ## Tasks
 - [x] Implement a Dominance Tree Walk of the procedure
