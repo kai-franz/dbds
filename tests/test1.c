@@ -14,5 +14,5 @@ int foo(int x, int y, int z) {
   } else {
     c = 0;
   }
-  return b + c;
+  return b * c;
 }

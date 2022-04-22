@@ -27,21 +27,23 @@ bool simulateSR(SimulationResult &result) {
           outs() << "Operand 0 is power of 2\n";
           auto C = ConstantInt::get(Op0->getType(), Op0->getValue().exactLogBase2());
           auto new_inst = BinaryOperator::Create(Instruction::Shl, BI->getOperand(1), C);
-          result.synonymMap[&I] = new_inst;
+          result.set(&I, new_inst);
           changed = true;
         } else if (Op1 != nullptr && Op1->getValue().isPowerOf2()) {
           outs() << "Operand 1 is power of 2\n";
           auto C = ConstantInt::get(Op1->getType(), Op1->getValue().exactLogBase2());
           auto new_inst = BinaryOperator::Create(Instruction::Shl, BI->getOperand(0), C);
-          result.synonymMap[&I] = new_inst;
+          result.set(&I, new_inst);
           changed = true;
         }
       } else if (BI->getOpcode() == Instruction::UDiv) {
         auto *Op1 = dyn_cast<ConstantInt>(result.lookupInst(BI->getOperand(1)));
-        if (Op1 != nullptr && Op1->getValue().isPowerOf2()) {
+//        if ()
+//        } else
+          if (Op1 != nullptr && Op1->getValue().isPowerOf2()) {
           auto C = ConstantInt::get(Op1->getType(), Op1->getValue().exactLogBase2());
           auto new_inst = BinaryOperator::Create(Instruction::LShr, BI->getOperand(0), C);
-          result.synonymMap[&I] = new_inst;
+          result.set(&I, new_inst);
           changed = true;
         }
       }

@@ -20,13 +20,14 @@ class DbdsPass : public FunctionPass {
   static char ID;
   std::vector<SimulatedOptimization> optimizations { simulateCF, simulateSR };
   std::vector<SimulationResult> opts;
+  SynonymMap globalMap;
+  std::vector<BasicBlock*> toDelete;
 
   DbdsPass() : FunctionPass(ID) {}
 
    bool runOnFunction(Function &F) override {
     DominatorTree &D = getAnalysis<DominatorTreeWrapperPass>().getDomTree();
     bool modified = false;
-
 
     // depth-first traversal based on implementation of DominatorTreeBase< NodeT, IsPostDom >::updateDFSNumbers()
     // from GenericDomTree.h
@@ -69,14 +70,43 @@ class DbdsPass : public FunctionPass {
       }
     }
     applySimulationResults();
-    outs() << "--------- final BBs ---------\n";
 
-    for(auto &BB : F) {
-      outs() << BB << "\n";
-    }
-    while (mergeBlocks(F)) {
-      modified = true;
-    }
+
+//   for (auto &BB : F) {
+//     if (!BB.hasNPredecessorsOrMore(1)) {
+//       outs() << "BB ";
+//       BB.printAsOperand(outs(), false);
+//       outs() << " has no predecessors; removing it\n";
+//       for(auto &inst : BB) {
+//         // if inst has no uses
+//         if (!inst.use_empty()) {
+//           outs() << "inst has uses: " << inst << "\n";
+//           // print uses of inst
+//           for (auto UI = inst.use_begin(), UE = inst.use_end(); UI != UE; ++UI) {
+//             outs() << "use: " << *UI->getUser() << "\n";
+//           }
+//         }
+//       }
+//       toDelete.push_back(&BB);
+//     }
+//   }
+
+   for(auto &BB : toDelete) {
+     outs() << "deleting ";
+     BB->printAsOperand(outs(), false);
+     outs() << "\n";
+     DeleteDeadBlock(BB);
+   }
+
+     outs() << "--------- final BBs ---------\n";
+
+     for(auto &BB : F) {
+       outs() << BB << "\n";
+     }
+
+//    while (mergeBlocks(F)) {
+//      modified = true;
+//    }
     return modified;
   }
 
@@ -86,10 +116,10 @@ class DbdsPass : public FunctionPass {
 
   void simulate(BasicBlock *BB, BasicBlock *predBB) {
     // ValueMap of phi instructions to their respective values
-    opts.emplace_back(BB, predBB);
+    opts.emplace_back(BB, predBB, &globalMap);
     auto &result = opts.back();
     for (auto &phi : BB->phis()) {
-      result.synonymMap[&phi] = phi.getIncomingValueForBlock(predBB);
+      result.set(&phi, phi.getIncomingValueForBlock(predBB));
       outs() << "incoming value: " << *phi.getIncomingValueForBlock(predBB) << "\n";
     }
     // simulate all optimizations
@@ -99,8 +129,8 @@ class DbdsPass : public FunctionPass {
   }
 
   void applySimulationResults() {
-    outs() << "-----------------------------------Applying simulation results\n";
     for (auto &opt : opts) {
+    outs() << "-----------------------------------Applying simulation results\n";
       // print synonym map
 //      for (const auto &synonym : opt.synonymMap) {
 //        outs() << "synonym: " << *synonym.first << " -> " << *synonym.second << "\n";
@@ -118,17 +148,14 @@ class DbdsPass : public FunctionPass {
         if (auto phi = dyn_cast<PHINode>(&inst)) {
           outs() << "phi: " << *phi << "\n";
           phi->removeIncomingValue(opt.predBB, false);
-          auto it = opt.synonymMap.find(&inst);
-          assert(it != opt.synonymMap.end());
-          replacementValue = it->second;
+          replacementValue = opt.lookup(&inst);
         }
         else {
           Instruction *replacementInst;
           outs() << "inst: " << inst << "\n";
-          auto it = opt.synonymMap.find(&inst);
-          if (it != opt.synonymMap.end()) {
-            outs() << "replacing " << inst << " with " << *opt.synonymMap[&inst] << "\n";
-            replacementValue = it->second;
+          replacementValue = opt.lookup(&inst);
+          if (replacementValue != nullptr) {
+            outs() << "replacing " << inst << " with " << replacementValue << "\n";
             replacementInst = dyn_cast<Instruction>(replacementValue);
           } else {
             replacementInst = inst.clone();
@@ -139,14 +166,14 @@ class DbdsPass : public FunctionPass {
             // iterator over replacementInst's operands
             for (auto OI = replacementInst->op_begin(), OE = replacementInst->op_end(); OI != OE; ++OI) {
               if (isa<Instruction>(*OI)) {
-                auto synIt = opt.synonymMap.find(cast<Instruction>(*OI));
-                if (synIt != opt.synonymMap.end()) {
-                  outs() << "replacing " << **OI << " in " << (*OI->getUser()) << " with " << *synIt->second << "\n";
-                  *OI = synIt->second;
+                auto syn = opt.lookup(cast<Instruction>(*OI));
+                if (syn != nullptr) {
+                  outs() << "replacing " << **OI << " in " << (*OI->getUser()) << " with " << *syn << "\n";
+                  *OI = syn;
                 }
               }
             }
-            opt.synonymMap[&inst] = replacementInst;
+            opt.set(&inst, replacementInst);
             replacementInst->insertBefore(opt.predBB->getTerminator());
           }
         }
@@ -159,7 +186,9 @@ class DbdsPass : public FunctionPass {
               outs() << *I << " is a phi node" << "\n";
             }
             if (I->getParent() != opt.BB) {
-              outs() << *I << " parent is not original BB: " << *I->getParent() << "\n";
+              outs() << *I << " parent is not original BB: ";
+              I->getParent()->printAsOperand(outs(), false);
+              outs() << "\n";
             }
             usedOutside = true;
             break;
@@ -184,32 +213,12 @@ class DbdsPass : public FunctionPass {
             // because of self-loops.
             return (phiNode || parent != opt.BB) && !(parent == phiBB && phiNode);
           });
-          ValueHandleBase::ValueIsRAUWd(&inst, phi);
+          globalMap[&inst] = phi;
         }
       }
       // if opt.BB has no predecessors, remove it
       if (!opt.BB->hasNPredecessorsOrMore(1)) {
-        outs() << "BB ";
-        opt.BB->printAsOperand(outs(), false);
-        outs() << " has no predecessors; removing it\n";
-        for(auto &inst : *opt.BB) {
-          // if inst has no uses
-          if (!inst.use_empty()) {
-            outs() << "inst has uses: " << inst << "\n";
-            // print uses of inst
-            for (auto UI = inst.use_begin(), UE = inst.use_end(); UI != UE; ++UI) {
-              outs() << "use: " << *UI->getUser() << "\n";
-            }
-          }
-        }
-        for (auto &inst : *phiBB) {
-          if (auto phi = dyn_cast<PHINode>(&inst)) {
-            outs() << "removing incoming value for phi: " << *phi << "\n";
-          } else {
-            break;
-          }
-        }
-        DeleteDeadBlock(opt.BB);
+        toDelete.push_back(opt.BB);
       }
     }
   }

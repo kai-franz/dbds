@@ -18,15 +18,16 @@ typedef ValueMap<Value *, TrackingVH<Value>> SynonymMap;
 struct SimulationResult {
  BasicBlock *BB;
  BasicBlock *predBB;
- std::unique_ptr<SynonymMap> _synonymMap;
- SynonymMap &synonymMap;
+ std::unique_ptr<SynonymMap> synonymMap;
+ SynonymMap *globalSynonymMap;
 
- SimulationResult(BasicBlock *BB, BasicBlock *predBB) : BB(BB), predBB(predBB), _synonymMap(new SynonymMap()), synonymMap(*_synonymMap) {}
+ SimulationResult(BasicBlock *BB, BasicBlock *predBB, SynonymMap *global) :
+  BB(BB), predBB(predBB), synonymMap(new SynonymMap()), globalSynonymMap(global) {}
 
  Value *lookupInst(Value *V) {
-   auto it = synonymMap.find(V);
-   if (it != synonymMap.end()) {
-     return it->second;
+   auto syn = lookup(V);
+   if (syn != nullptr) {
+     return syn;
    }
    return V;
  }
@@ -36,6 +37,21 @@ struct SimulationResult {
    I->setOperand(i, lookupInst(V));
   }
  }
+
+ Value *lookup(Value *V) {
+   if (globalSynonymMap->find(V) != globalSynonymMap->end()) {
+     return (*globalSynonymMap)[V];
+   }
+   if (synonymMap->find(V) != synonymMap->end()) {
+     return (*synonymMap)[V];
+   }
+   return nullptr;
+ }
+
+ void set(Value *key, Value *value) {
+   (*synonymMap)[key] = value;
+ }
+
 };
 
 }

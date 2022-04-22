@@ -31,7 +31,7 @@ bool simulateCF(SimulationResult &result) {
       Constant *C = ConstantFoldInstruction(new_I, I.getModule()->getDataLayout());
       if (C) {
         outs() << "Found constant folding for " << I << " to " << *C << "\n";
-        result.synonymMap[&I] = C;
+        result.set(&I, C);
         changed = true;
       }
     }
