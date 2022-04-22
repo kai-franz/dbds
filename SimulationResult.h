@@ -8,18 +8,20 @@
 #include "llvm/IR/Value.h"
 #include "llvm/IR/ValueMap.h"
 #include "llvm/IR/Instruction.h"
+#include "llvm/IR/ValueHandle.h"
 #include <unordered_map>
 
 namespace llvm {
 
-typedef std::unordered_map<Value *, Value *> SynonymMap;
+typedef ValueMap<Value *, TrackingVH<Value>> SynonymMap;
 
 struct SimulationResult {
  BasicBlock *BB;
  BasicBlock *predBB;
- SynonymMap synonymMap;
+ std::unique_ptr<SynonymMap> _synonymMap;
+ SynonymMap &synonymMap;
 
- SimulationResult(BasicBlock *BB, BasicBlock *predBB) : BB(BB), predBB(predBB) {}
+ SimulationResult(BasicBlock *BB, BasicBlock *predBB) : BB(BB), predBB(predBB), _synonymMap(new SynonymMap()), synonymMap(*_synonymMap) {}
 
  Value *lookupInst(Value *V) {
    auto it = synonymMap.find(V);

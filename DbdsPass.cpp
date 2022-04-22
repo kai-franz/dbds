@@ -86,7 +86,8 @@ class DbdsPass : public FunctionPass {
 
   void simulate(BasicBlock *BB, BasicBlock *predBB) {
     // ValueMap of phi instructions to their respective values
-    SimulationResult result(BB, predBB);
+    opts.emplace_back(BB, predBB);
+    auto &result = opts.back();
     for (auto &phi : BB->phis()) {
       result.synonymMap[&phi] = phi.getIncomingValueForBlock(predBB);
       outs() << "incoming value: " << *phi.getIncomingValueForBlock(predBB) << "\n";
@@ -95,16 +96,15 @@ class DbdsPass : public FunctionPass {
     for (auto &opt : optimizations) {
       opt(result);
     }
-    opts.push_back(result);
   }
 
   void applySimulationResults() {
     outs() << "-----------------------------------Applying simulation results\n";
     for (auto &opt : opts) {
       // print synonym map
-      for (auto &synonym : opt.synonymMap) {
-        outs() << "synonym: " << *synonym.first << " -> " << *synonym.second << "\n";
-      }
+//      for (const auto &synonym : opt.synonymMap) {
+//        outs() << "synonym: " << *synonym.first << " -> " << *synonym.second << "\n";
+//      }
       opt.predBB->getTerminator()->eraseFromParent();
       BasicBlock *phiBB = opt.BB->splitBasicBlock(opt.BB->getTerminator(), "split");
       BranchInst::Create(phiBB, opt.predBB);
@@ -113,14 +113,17 @@ class DbdsPass : public FunctionPass {
         if (&inst == opt.BB->getTerminator()) {
           break;
         }
-        Instruction *replacementInst;
+
         Value *replacementValue;
         if (auto phi = dyn_cast<PHINode>(&inst)) {
           outs() << "phi: " << *phi << "\n";
           phi->removeIncomingValue(opt.predBB, false);
-          replacementInst = phi;
+          auto it = opt.synonymMap.find(&inst);
+          assert(it != opt.synonymMap.end());
+          replacementValue = it->second;
         }
         else {
+          Instruction *replacementInst;
           outs() << "inst: " << inst << "\n";
           auto it = opt.synonymMap.find(&inst);
           if (it != opt.synonymMap.end()) {
@@ -147,7 +150,7 @@ class DbdsPass : public FunctionPass {
             replacementInst->insertBefore(opt.predBB->getTerminator());
           }
         }
-        // iterate over the replacementInst's uses, checking if there is at least one oustide of BB
+        // iterate over the inst's uses, checking if there is at least one oustide of BB
         bool usedOutside = false;
         for (auto UI = inst.use_begin(), UE = inst.use_end(); UI != UE; ++UI) {
           auto *I = dyn_cast<Instruction>(UI->getUser());
@@ -172,7 +175,7 @@ class DbdsPass : public FunctionPass {
           inst.replaceUsesWithIf(phi, [&](Use &U) {
             bool phiNode = isa<PHINode>(U.getUser());
             auto parent = dyn_cast<Instruction>(U.getUser())->getParent();
-            // Replace all uses that do not see the phi node.
+            // Replace all uses that see the phi node.
             // We don't replace the following:
             // 1. The other uses inside the original basic block
             // 2. The uses inside the phi node we just added
@@ -181,11 +184,24 @@ class DbdsPass : public FunctionPass {
             // because of self-loops.
             return (phiNode || parent != opt.BB) && !(parent == phiBB && phiNode);
           });
+          ValueHandleBase::ValueIsRAUWd(&inst, phi);
         }
       }
       // if opt.BB has no predecessors, remove it
       if (!opt.BB->hasNPredecessorsOrMore(1)) {
-        outs() << "BB has no predecessors; removing it\n";
+        outs() << "BB ";
+        opt.BB->printAsOperand(outs(), false);
+        outs() << " has no predecessors; removing it\n";
+        for(auto &inst : *opt.BB) {
+          // if inst has no uses
+          if (!inst.use_empty()) {
+            outs() << "inst has uses: " << inst << "\n";
+            // print uses of inst
+            for (auto UI = inst.use_begin(), UE = inst.use_end(); UI != UE; ++UI) {
+              outs() << "use: " << *UI->getUser() << "\n";
+            }
+          }
+        }
         for (auto &inst : *phiBB) {
           if (auto phi = dyn_cast<PHINode>(&inst)) {
             outs() << "removing incoming value for phi: " << *phi << "\n";
