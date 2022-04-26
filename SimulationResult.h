@@ -38,6 +38,22 @@ struct SimulationResult {
   }
  }
 
+//  Value *lookup(Value *V) const {
+//    if (globalSynonymMap->find(V) != globalSynonymMap->end() &&
+//        isa<Instruction>((*globalSynonymMap)[V].getValPtr()) &&
+//        isa<Instruction>(V) &&
+//        dyn_cast<Instruction>((*globalSynonymMap)[V].getValPtr())->getParent() !=
+////                 dyn_cast<Instruction>(V)->getParent()
+//            predBB
+//        ) {
+//      return (*globalSynonymMap)[V];
+//    }
+//    if (synonymMap->find(V) != synonymMap->end()) {
+//      return (*synonymMap)[V];
+//    }
+//    return nullptr;
+//  }
+
  Value *lookup(Value *V) {
    if (globalSynonymMap->find(V) != globalSynonymMap->end()) {
      return (*globalSynonymMap)[V];

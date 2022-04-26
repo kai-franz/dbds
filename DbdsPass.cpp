@@ -155,7 +155,7 @@ class DbdsPass : public FunctionPass {
           outs() << "inst: " << inst << "\n";
           replacementValue = opt.lookup(&inst);
           if (replacementValue != nullptr) {
-            outs() << "replacing " << inst << " with " << replacementValue << "\n";
+            outs() << "replacing " << inst << " with " << *replacementValue << "\n";
             replacementInst = dyn_cast<Instruction>(replacementValue);
           } else {
             replacementInst = inst.clone();
@@ -167,8 +167,14 @@ class DbdsPass : public FunctionPass {
             for (auto OI = replacementInst->op_begin(), OE = replacementInst->op_end(); OI != OE; ++OI) {
               if (isa<Instruction>(*OI)) {
                 auto syn = opt.lookup(cast<Instruction>(*OI));
-                if (syn != nullptr) {
+                if (syn != nullptr && syn != &*OI->getUser()) {
                   outs() << "replacing " << **OI << " in " << (*OI->getUser()) << " with " << *syn << "\n";
+                  outs() << "BB:" << opt.BB << "\n";
+                  outs() << "predBB:" << opt.predBB << "\n";
+                  if (replacementInst != nullptr && replacementInst->getParent() != dyn_cast<Instruction>(syn)->getParent()) {
+                    outs() << "replacementValue's parent: " << replacementInst->getParent() << "\n";
+                  }
+                  outs() << "inst's parent: " << inst.getParent() << "\n";
                   *OI = syn;
                 }
               }
