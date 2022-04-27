@@ -104,9 +104,9 @@ class DbdsPass : public FunctionPass {
        outs() << BB << "\n";
      }
 
-//    while (mergeBlocks(F)) {
-//      modified = true;
-//    }
+    while (mergeBlocks(F)) {
+      modified = true;
+    }
     return modified;
   }
 
@@ -132,9 +132,11 @@ class DbdsPass : public FunctionPass {
     for (auto &opt : opts) {
     outs() << "-----------------------------------Applying simulation results\n";
       // print synonym map
-//      for (const auto &synonym : opt.synonymMap) {
-//        outs() << "synonym: " << *synonym.first << " -> " << *synonym.second << "\n";
-//      }
+      for (const auto &synonym : *opt.synonymMap) {
+        if (synonym.first != nullptr && synonym.second != nullptr) {
+          outs() << "synonym: " << *synonym.first << " -> " << *synonym.second << "\n";
+        }
+      }
       opt.predBB->getTerminator()->eraseFromParent();
       BasicBlock *phiBB = opt.BB->splitBasicBlock(opt.BB->getTerminator(), "split");
       BranchInst::Create(phiBB, opt.predBB);
@@ -143,7 +145,6 @@ class DbdsPass : public FunctionPass {
         if (&inst == opt.BB->getTerminator()) {
           break;
         }
-
         Value *replacementValue;
         if (auto phi = dyn_cast<PHINode>(&inst)) {
           outs() << "phi: " << *phi << "\n";
@@ -166,21 +167,16 @@ class DbdsPass : public FunctionPass {
             // iterator over replacementInst's operands
             for (auto OI = replacementInst->op_begin(), OE = replacementInst->op_end(); OI != OE; ++OI) {
               if (isa<Instruction>(*OI)) {
-                auto syn = opt.lookup(cast<Instruction>(*OI));
+                auto syn = opt.lookupWithGlobalMap(dyn_cast<Instruction>(*OI));
                 if (syn != nullptr && syn != &*OI->getUser()) {
                   outs() << "replacing " << **OI << " in " << (*OI->getUser()) << " with " << *syn << "\n";
-                  outs() << "BB:" << opt.BB << "\n";
-                  outs() << "predBB:" << opt.predBB << "\n";
-                  if (replacementInst != nullptr && replacementInst->getParent() != dyn_cast<Instruction>(syn)->getParent()) {
-                    outs() << "replacementValue's parent: " << replacementInst->getParent() << "\n";
-                  }
-                  outs() << "inst's parent: " << inst.getParent() << "\n";
                   *OI = syn;
                 }
               }
             }
             opt.set(&inst, replacementInst);
             replacementInst->insertBefore(opt.predBB->getTerminator());
+            outs() << "adding " << *replacementInst << "\n";
           }
         }
         // iterate over the inst's uses, checking if there is at least one oustide of BB
@@ -219,7 +215,9 @@ class DbdsPass : public FunctionPass {
             // because of self-loops.
             return (phiNode || parent != opt.BB) && !(parent == phiBB && phiNode);
           });
-          globalMap[&inst] = phi;
+          if (globalMap.find(&inst) == globalMap.end()) {
+            globalMap[&inst] = phi;
+          }
         }
       }
       // if opt.BB has no predecessors, remove it
