@@ -14,7 +14,7 @@ We are implementing a subset of the optimizations from [Dominance-Based Duplicat
 - [x] Implement Constant Folding for addition instructions
 - [x] Implenent Constant folding for other instructions
 - [x] \(75% goal) Apply the results of a Duplication Simulation to the function
-- [ ] Implement Strength Reduction
-- [ ] \(100% goal) Implement Read Elimination
+- [x] Implement Strength Reduction
+- [x] \(100% goal) Implement Read Elimination
 - [ ] Add heuristics to determine if proposed optimization is beneficial
 - [ ] Implement Conditional Elimination
