@@ -75,25 +75,6 @@ class DbdsPass : public FunctionPass {
     applySimulationResults();
 
 
-//   for (auto &BB : F) {
-//     if (!BB.hasNPredecessorsOrMore(1)) {
-//       outs() << "BB ";
-//       BB.printAsOperand(outs(), false);
-//       outs() << " has no predecessors; removing it\n";
-//       for(auto &inst : BB) {
-//         // if inst has no uses
-//         if (!inst.use_empty()) {
-//           outs() << "inst has uses: " << inst << "\n";
-//           // print uses of inst
-//           for (auto UI = inst.use_begin(), UE = inst.use_end(); UI != UE; ++UI) {
-//             outs() << "use: " << *UI->getUser() << "\n";
-//           }
-//         }
-//       }
-//       toDelete.push_back(&BB);
-//     }
-//   }
-
    for(auto &BB : toDelete) {
      outs() << "deleting ";
      BB->printAsOperand(outs(), false);
