@@ -8,6 +8,8 @@ We are implementing a subset of the optimizations from [Dominance-Based Duplicat
 
 [Milestone (PDF)](./Milestone.pdf)
 
+[Final Report (PDF)](./Final_Report.pdf)
+
 ## Tasks
 - [x] Implement a Dominance Tree Walk of the procedure
 - [x] Implement the Duplication Simulation Traversal step within the walk
