@@ -90,6 +90,30 @@ class DbdsPass : public FunctionPass {
     while (mergeBlocks(F)) {
       modified = true;
     }
+     for (auto sim : globalMap) {
+       if (sim.second.first != nullptr && sim.second.first->getParent() == nullptr) {
+         sim.second.first->deleteValue();
+       }
+       if (sim.second.second != nullptr && isa<Instruction>(sim.second.second) && dyn_cast<Instruction>(sim.second.second)->getParent() == nullptr) {
+         sim.second.second->deleteValue();
+       }
+       if (sim.first != nullptr && isa<Instruction>(sim.first) && dyn_cast<Instruction>(sim.first)->getParent() == nullptr) {
+         sim.first->deleteValue();
+       }
+     }
+    for (auto &opt : opts) {
+      for (auto sim : *opt.synonymMap) {
+        if (sim.second.first != nullptr && sim.second.first->getParent() == nullptr) {
+          sim.second.first->deleteValue();
+        }
+        if (sim.second.second != nullptr && isa<Instruction>(sim.second.second) && dyn_cast<Instruction>(sim.second.second)->getParent() == nullptr) {
+          sim.second.second->deleteValue();
+        }
+        if (sim.first != nullptr && isa<Instruction>(sim.first) && dyn_cast<Instruction>(sim.first)->getParent() == nullptr) {
+          sim.first->deleteValue();
+        }
+      }
+    }
     return modified;
   }
 
@@ -208,6 +232,7 @@ class DbdsPass : public FunctionPass {
       if (!opt.BB->hasNPredecessorsOrMore(1)) {
         toDelete.push_back(opt.BB);
       }
+      break;
     }
   }
 
