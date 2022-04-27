@@ -1,3 +1,4 @@
+./bad_compile.sh $1
 cd ..
 make clean
 make
