@@ -13,7 +13,7 @@
 
 namespace llvm {
 
-typedef ValueMap<Value *, TrackingVH<Value>> SynonymMap;
+typedef ValueMap<Value *, std::pair<Instruction *, WeakTrackingVH>> SynonymMap;
 
 struct SimulationResult {
  BasicBlock *BB;
@@ -40,12 +40,12 @@ struct SimulationResult {
 
   Value *lookupWithGlobalMap(Value *V) const {
     if (synonymMap->find(V) != synonymMap->end()) {
-      Value *local = (*synonymMap)[V];
+      Value *local = (*synonymMap)[V].second;
       if (globalSynonymMap->find(local) != globalSynonymMap->end() &&
           isa<Instruction>(local) &&
           dyn_cast<Instruction>(local)->getParent() != BB
           ) {
-        return (*globalSynonymMap)[local];
+        return (*globalSynonymMap)[local].second;
       }
       return local;
     }
@@ -53,21 +53,41 @@ struct SimulationResult {
         isa<Instruction>(V) &&
         dyn_cast<Instruction>(V)->getParent() != BB
         ) {
-      return (*globalSynonymMap)[V];
+      return (*globalSynonymMap)[V].second;
     }
 
     return nullptr;
   }
 
+  // Looks up the replacement for a value as an operand.
  Value *lookup(Value *V) {
    if (synonymMap->find(V) != synonymMap->end()) {
-     return (*synonymMap)[V];
+     return (*synonymMap)[V].second;
    }
    return nullptr;
  }
 
+ // Looks up the replacement for a value itself.
+ Instruction *lookupReplacement(Value *V) {
+   if (synonymMap->find(V) != synonymMap->end()) {
+     return (*synonymMap)[V].first;
+   }
+   return nullptr;
+ }
+
+ // Sets the replacement for a value.
+ // Implicitly sets the replacement for the instruction itself to nullptr.
  void set(Value *key, Value *value) {
-   (*synonymMap)[key] = value;
+   (*synonymMap)[key] = std::make_pair(nullptr, value);
+ }
+
+ // Sets the replacement for a value and the instruction itself.
+ void set(Value *key, Value *value, Instruction *inst) {
+   (*synonymMap)[key] = std::make_pair(inst, value);
+ }
+
+ bool hasReplacement(Value *key) {
+   return synonymMap->find(key) != synonymMap->end();
  }
 
 };

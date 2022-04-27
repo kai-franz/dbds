@@ -8,7 +8,7 @@ INC=-I/Users/kaifranz/CLionProjects/llvm-project/llvm/include
 HEADS=/home/user/llvm-v10/include
 
 
-%.so: %.o
+%.so: %.o available-support.o
 	$(CXX) -g -dylib -shared $^ -o $@
 
 clean:

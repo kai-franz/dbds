@@ -10,6 +10,9 @@
 #include "ConstantFolding.h"
 #include "StrengthReduction.h"
 #include "llvm/Transforms/Utils/BasicBlockUtils.h"
+#include "ReadElimination.h"
+#include "available-support.h"
+
 
 using namespace llvm;
 
@@ -18,7 +21,7 @@ namespace {
 class DbdsPass : public FunctionPass {
  public:
   static char ID;
-  std::vector<SimulatedOptimization> optimizations { simulateCF, simulateSR };
+  std::vector<SimulatedOptimization> optimizations { simulateCF, simulateSR, simulateRE };
   std::vector<SimulationResult> opts;
   SynonymMap globalMap;
   std::vector<BasicBlock*> toDelete;
@@ -133,8 +136,8 @@ class DbdsPass : public FunctionPass {
     outs() << "-----------------------------------Applying simulation results\n";
       // print synonym map
       for (const auto &synonym : *opt.synonymMap) {
-        if (synonym.first != nullptr && synonym.second != nullptr) {
-          outs() << "synonym: " << *synonym.first << " -> " << *synonym.second << "\n";
+        if (synonym.first != nullptr && synonym.second.second != nullptr) {
+          outs() << "synonym: " << *synonym.first << " -> " << *synonym.second.second << "\n";
         }
       }
       opt.predBB->getTerminator()->eraseFromParent();
@@ -152,16 +155,17 @@ class DbdsPass : public FunctionPass {
           replacementValue = opt.lookup(&inst);
         }
         else {
-          Instruction *replacementInst;
-          outs() << "inst: " << inst << "\n";
+          Instruction *replacementInst = opt.lookupReplacement(&inst);
           replacementValue = opt.lookup(&inst);
-          if (replacementValue != nullptr) {
-            outs() << "replacing " << inst << " with " << *replacementValue << "\n";
-            replacementInst = dyn_cast<Instruction>(replacementValue);
-          } else {
+          outs() << "inst: " << inst << "\n";
+          if (!opt.hasReplacement(&inst)) {
             replacementInst = inst.clone();
             replacementInst->setName(inst.getName() + ".sim");
             replacementValue = replacementInst;
+          } else if (replacementInst != nullptr) {
+            outs() << "replacing " << inst << " with " << *replacementValue << "\n";
+          } else {
+            outs() << "deleting " << inst << "\n";
           }
           if (replacementInst != nullptr) {
             // iterator over replacementInst's operands
@@ -216,7 +220,7 @@ class DbdsPass : public FunctionPass {
             return (phiNode || parent != opt.BB) && !(parent == phiBB && phiNode);
           });
           if (globalMap.find(&inst) == globalMap.end()) {
-            globalMap[&inst] = phi;
+            globalMap[&inst] = std::make_pair(nullptr, phi);
           }
         }
       }
