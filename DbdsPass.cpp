@@ -244,6 +244,5 @@ class DbdsPass : public FunctionPass {
 char DbdsPass::ID = 0;
 RegisterPass<DbdsPass> X("dbds", "15745 Dominance-Based Deduplication Simulation");
 
-
-}
+} // namespace
 
